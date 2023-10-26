@@ -1,0 +1,10 @@
+# global
+.vscode
+cache
+
+# project specific files, geometry
+*.cpg
+*.dbf
+*.prj
+*.shp
+*.shx
