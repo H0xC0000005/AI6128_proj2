@@ -2,9 +2,13 @@
 .vscode
 cache
 
-# project specific files, geometry
+# project specific files, geometry stored data
+# this class of data should be obtained by running local scripts
 *.cpg
 *.dbf
 *.prj
 *.shp
 *.shx
+
+# .geojson file should be get on the fly
+*.geojson
