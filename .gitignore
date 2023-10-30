@@ -10,5 +10,8 @@ cache
 *.shp
 *.shx
 
+*.gpkg
+*.graphml
+
 # .geojson file should be get on the fly
 *.geojson

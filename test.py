@@ -5,45 +5,61 @@ import os
 import pandas as pd
 
 
-def save_graph_shapefile_directional(G, filepath=None, encoding="utf-8"):
-    # default filepath if none was provided
-    if filepath is None:
-        filepath = os.path.join(ox.settings.data_folder, "graph_shapefile")
-
-    # if save folder does not already exist, create it (shapefiles
-    # get saved as set of files)
-    if not filepath == "" and not os.path.exists(filepath):
-        os.makedirs(filepath)
-    filepath_nodes = os.path.join(filepath, "nodes.shp")
-    filepath_edges = os.path.join(filepath, "edges.shp")
-
-    # convert undirected graph to gdfs and stringify non-numeric columns
-    gdf_nodes, gdf_edges = ox.utils_graph.graph_to_gdfs(G)
-    gdf_nodes = ox.io._stringify_nonnumeric_cols(gdf_nodes)
-    gdf_edges = ox.io._stringify_nonnumeric_cols(gdf_edges)
-    # We need an unique ID for each edge
-    # NOTE: tuple format not supported. cannot directly use gdf_edges.index since
-    # this is a tuple returned. must post process.
-    gdf_edges["fid"] = gdf_edges.index
-    gdf_edges["fid"] = gdf_edges["fid"].apply(lambda x: str(x))
-    # save the nodes and edges as separate ESRI shapefiles
-    # NOTE: may raise ValueError for invalid entry type, e.g. tuple, list, bytes
-    gdf_nodes.to_file(filepath_nodes, encoding=encoding)
-    gdf_edges.to_file(filepath_edges, encoding=encoding)
-    pass
+geopath = f"./Porto.graphml"
+csvpath = f"./train_1500.csv"
 
 
-print("osmnx version", ox.__version__)
+def parse_gps_pos(elem_str: str):
+    points = []
+    # remove outer pair of brackets
+    elem_str_trimmed = elem_str[2:-2]
+    pt_strs = elem_str_trimmed.split(f"],[")
+    for pt_str in pt_strs:
+        # cur_trimmed = pt_str[1:-1]
+        cur_lst = pt_str.split(f",")
+        for idx in range(len(cur_lst)):
+            cur_lst[idx] = float(cur_lst[idx])
+        points.append(cur_lst)
+    return points
 
-# # format is (long, long, lat, lat). E and N are positive, W and S are negative
-# bounds = (18.029122582902115, 18.070836297501724, 59.33476653724975, 59.352622230576124)
-# x1, x2, y1, y2 = bounds
-# boundary_polygon = Polygon([(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
-# G = ox.graph_from_polygon(boundary_polygon, network_type="drive")
-# start_time = time.time()
-# save_graph_shapefile_directional(G, filepath="./stockholm")
-# print("--- %s seconds ---" % (time.time() - start_time))
 
-place = "Stockholm, Sweden"
-G = ox.graph_from_place(place, network_type="drive", which_result=1)
-save_graph_shapefile_directional(G, filepath="stockholm")
+df15 = pd.read_csv(csvpath).head(15)
+G = ox.load_graphml(geopath)
+gps_pos = df15["POLYLINE"]
+gps_pos = gps_pos.apply(parse_gps_pos)
+
+gps_nodes = {}
+for idx in range(len(gps_pos)):
+    cur_gps_pos = gps_pos[idx]
+    cur_long = []
+    cur_lat = []
+    for point in cur_gps_pos:
+        cur_long.append(point[0])
+        cur_lat.append(point[1])
+    nearest_nodes = ox.distance.nearest_nodes(G, X=cur_long, Y=cur_lat)
+    gps_nodes[idx] = nearest_nodes
+
+k = 5
+
+# Create a map of the road network using OSMnx
+cur_route_raw = gps_nodes[k]
+cur_route = []
+prev_id = cur_route_raw[0]
+for idx in range(1, len(cur_route_raw) - 1):
+    if cur_route_raw[idx] != prev_id:
+        cur_route.append(cur_route_raw[idx])
+        prev_id = cur_route_raw[idx]
+    else:
+        pass
+print(cur_route)
+
+fig, ax = ox.plot.plot_graph_route(
+    ox.project_graph(G),
+    cur_route,
+)
+# for node in cur_route:
+#     node_data = G.nodes[node]
+#     # print(node_data)
+#     ax.plot(node_data['y'], node_data['x'], 'ro', markersize=80, zorder=4)  # 'ro' for red circles as markers
+#     ax.plot(node_data['x'], node_data['y'], 'ro', markersize=80, zorder=4)  # 'ro' for red circles as markers
+# plt.show()
